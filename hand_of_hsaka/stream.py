@@ -1,4 +1,3 @@
-
 from dotenv import dotenv_values
 import tweepy
 import random
