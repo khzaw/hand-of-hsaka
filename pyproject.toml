@@ -9,6 +9,7 @@ python = "^3.10"
 ipython = "^7.31.0"
 tweepy = "^4.4.0"
 python-dotenv = "^0.19.2"
+python-binance = "^1.0.15"
 
 [tool.poetry.dev-dependencies]
 pytest = "^5.2"
