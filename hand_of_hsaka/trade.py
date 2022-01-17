@@ -1,50 +1,49 @@
 from dotenv import dotenv_values
+from binance.exceptions import BinanceAPIException
 from binance import Client, ThreadedWebsocketManager, ThreadedDepthCacheManager, AsyncClient, BinanceSocketManager
 import asyncio
+import json
 
 config = {
-  **dotenv_values("../env")
+  **dotenv_values("../.env")
 }
 
-# the async keyword in front of the function defines it as a couroutine.
-# If you call a coroutine directly the function isn't executed, you just get the coroutine back.
-# To actually execute the coroutine we use the await keyword.
+class ArbClient:
+    @classmethod
+    async def create(cls, api, secret, test=True):
+        self = ArbClient()
+        self.client = await AsyncClient.create(
+          api,
+          secret,
+          testnet=test
+        )
+        return self
 
-class BinanceClient:
-    def __init__(self):
-        pass
+    def _get_avg_fill(self, fills, quantity):
+        return sum([float(f['price']) * (float(f['qty']) / quantity) for f in fills])
 
-async def order_book(client, symbol):
-    order_book = await client.get_order_book(symbol=symbol)
-    print(order_book)
-
-
-async def kline_listener(client):
-  bm = BinanceSocketManager(client)
-  symbol = 'BNBBTC'
-  res_count = 0
-  async with bm.kline_socket(symbol=symbol) as stream:
-    while True:
-      res = await stream.recv()
-      res_count += 1
-      print(res)
-      if res_count == 5:
-          res_count = 0
-          loop.call_soon(asyncio.create_task, order_book(client, symbol))
+    async def buy(self, symbol, quantity):
+        try:
+          market_res = await self.client.order_market_sell(symbol=symbol, quantity=quantity)
+        except BinanceAPIException as e:
+            print(e)
+        else:
+            # print(json.dumps(market_res, indent=2))
+            fill = self._get_avg_fill(market_res['fills'], quantity)
+            print(fill)
+        await self.client.close_connection()
 
 
 async def main():
-  client = await AsyncClient.create(config['BINANCE_API'], config['BINANCE_SECRET'], testnet=True)
-  await kline_listener(client)
+    arb = await ArbClient.create(
+      config['BINANCE_TESTNET_API'],
+      config['BINANCE_TESTNET_SECRET'])
+
+    await arb.buy('BTCUSDT', 0.001)
 
 
-# asyncio runs with an event loop,
 if __name__ == "__main__":
-  loop = asyncio.get_event_loop()
+  loop = asyncio.new_event_loop()
+  asyncio.set_event_loop(loop)
   loop.run_until_complete(main())
-
-
-client = Client(config['BINANCE_API'], config['BINANCE_SECRET'])
-
-# get market depth
-depth = client.get_order_book(symbol='BNBBTC')
+  loop.close()
